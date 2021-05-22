@@ -17,6 +17,7 @@ import io.kotest.engine.spec.SpecExecutor
 import io.kotest.engine.spec.sort
 import io.kotest.fp.Try
 import io.kotest.mpp.log
+import kotlinx.coroutines.withTimeout
 import kotlin.reflect.KClass
 import kotlin.script.templates.standard.ScriptTemplateWithArgs
 
@@ -80,7 +81,7 @@ class KotestEngine(private val config: KotestEngineConfig) {
             }
          )
 
-      Try { submitAll(plan) }
+      Try { withTimeout(configuration.projectTimeout) { submitAll(plan) } }
          .fold(
             { error ->
                log(error) { "KotestEngine: Error during submit all" }
