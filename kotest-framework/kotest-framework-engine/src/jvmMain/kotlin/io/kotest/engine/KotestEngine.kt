@@ -2,6 +2,7 @@ package io.kotest.engine
 
 import io.kotest.core.Tags
 import io.kotest.core.config.configuration
+import io.kotest.core.extensions.ProjectExtension
 import io.kotest.core.filter.TestFilter
 import io.kotest.core.spec.Spec
 import io.kotest.core.spec.afterProject
@@ -49,6 +50,7 @@ class KotestEngine(private val config: KotestEngineConfig) {
     * Starts execution of the given test plan.
     */
    suspend fun execute(plan: TestPlan) {
+      val projectExtensions = configuration.extensions().filterIsInstance<ProjectExtension>().reversed()
 
       if (config.dumpConfig) {
          dumpConfig()
@@ -75,12 +77,14 @@ class KotestEngine(private val config: KotestEngineConfig) {
                   )
                   return
                }
-
-
             }
          )
 
-      Try { submitAll(plan) }
+      Try {
+         runProjectExtensions(projectExtensions) {
+            submitAll(plan)
+         }
+      }
          .fold(
             { error ->
                log(error) { "KotestEngine: Error during submit all" }
@@ -95,9 +99,21 @@ class KotestEngine(private val config: KotestEngineConfig) {
                   { end(listOf(it)) },
                   { end(it) }
                )
-
             }
          )
+   }
+
+   private tailrec suspend fun runProjectExtensions(extensions: List<ProjectExtension>, f: suspend () -> Unit) {
+      if (extensions.isEmpty())
+         f()
+      else {
+         val head = extensions.first()
+         val tail = extensions.drop(1)
+
+         runProjectExtensions(tail) {
+            head.aroundProject(f)
+         }
+      }
    }
 
    fun cleanup() {
